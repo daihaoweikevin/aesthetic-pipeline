@@ -6,28 +6,94 @@
 <title>绝美图片库 — Aesthetic Lens</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #f8f6f2; color: #2c2c2c;
-    font-family: "Noto Serif SC", "Songti SC", Georgia, serif;
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    text-align: center;
+  body { 
+    background: #f8f6f2; color: #2c2c2c; font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
+    min-height: 100vh;
   }
-  .message {
-    padding: 60px 30px;
+  .hero {
+    padding: 80px 30px 60px; text-align: center;
+    background: linear-gradient(180deg, #fff 0%, #f8f6f2 100%);
+    border-bottom: 1px solid #e8e4dc;
   }
-  .message h1 { font-size: 2.5rem; font-weight: 300; letter-spacing: 0.08em; color: #1a1a1a; }
-  .message p { font-size: 1rem; color: #999; margin-top: 16px; font-weight: 300; line-height: 1.8; }
-  .message .icon { font-size: 4rem; margin-bottom: 20px; }
-  .hint { margin-top: 40px; font-size: 0.8rem; color: #ccc; }
+  .hero h1 { font-size: 2.8rem; font-weight: 300; letter-spacing: 0.08em; color: #1a1a1a; }
+  .hero .subtitle { font-size: 1rem; color: #999; margin-top: 12px; font-weight: 300; }
+  .hero .date { font-size: 0.8rem; color: #bbb; margin-top: 8px; }
+  .stats {
+    display: flex; justify-content: center; gap: 40px; margin-top: 30px; flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat .num { font-size: 2rem; font-weight: 300; color: #1a1a1a; }
+  .stat .label { font-size: 0.7rem; color: #bbb; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 4px; }
+
+  .section-header {
+    max-width: 1200px; margin: 50px auto 20px; padding: 0 20px;
+    font-size: 1.3rem; font-weight: 300; color: #555; letter-spacing: 0.05em;
+    border-bottom: 1px solid #e8e4dc; padding-bottom: 10px;
+  }
+
+  .gallery {
+    max-width: 1200px; margin: 0 auto; padding: 0 16px 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: #fff; border-radius: 6px; overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    transition: transform 0.25s, box-shadow 0.25s;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+  .card-img {
+    width: 100%; height: 220px; object-fit: cover; display: block;
+    background: #f0ece6;
+  }
+  .card-body { padding: 14px 16px; }
+  .card-badge {
+    display: inline-block; font-size: 0.6rem; padding: 2px 8px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; margin-bottom: 8px;
+  }
+  .badge-S { background: #fef3c7; color: #92400e; }
+  .badge-A { background: #dbeafe; color: #1e40af; }
+  .badge-B { background: #f3f4f6; color: #6b7280; }
+  .badge-C { background: #f3f4f6; color: #9ca3af; }
+  .card-source { font-size: 0.7rem; color: #bbb; text-transform: capitalize; }
+  .card-dims { font-size: 0.65rem; color: #ccc; margin-top: 2px; }
+
+  .empty { 
+    max-width: 1200px; margin: 60px auto; text-align: center; color: #ccc;
+    font-size: 1.2rem; font-weight: 300;
+  }
+
+  .footer {
+    text-align: center; padding: 40px; color: #ccc; font-size: 0.8rem;
+    border-top: 1px solid #e8e4dc;
+  }
+
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 1.8rem; }
+    .gallery { grid-template-columns: 1fr; padding: 0 12px; }
+    .stats { gap: 20px; }
+  }
 </style>
 </head>
 <body>
-<div class="message">
-  <div class="icon">🌸</div>
+<div class="hero">
   <h1>绝美图片库</h1>
-  <p>Aesthetic Lens Pipeline 正在筹建中</p>
-  <p>首次自动采集运行后，绝美图片将在此呈现</p>
-  <div class="hint">由 GitHub Actions 每周自动更新</div>
+  <div class="subtitle">Aesthetic Lens · 自动采集 · 审美筛选</div>
+  <div class="date">{date}</div>
+  <div class="stats">
+    <div class="stat"><div class="num">{total}</div><div class="label">收录</div></div>
+    <div class="stat"><div class="num">{top_score}</div><div class="label">最高分</div></div>
+    <div class="stat"><div class="num">{s_count}</div><div class="label">S级·绝美</div></div>
+    <div class="stat"><div class="num">{a_count}</div><div class="label">A级·优秀</div></div>
+  </div>
+</div>
+
+{sections}
+
+<div class="footer">
+  <p>由 Aesthetic Lens Pipeline 自动生成 · 每周更新</p>
+  <p style="margin-top:4px;font-size:0.7rem;">图片版权归原作者所有 · 仅供欣赏</p>
 </div>
 </body>
 </html>
