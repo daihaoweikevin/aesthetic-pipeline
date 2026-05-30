@@ -1,0 +1,96 @@
+name: 🎨 绝美图片自动采集与筛选
+
+on:
+  schedule:
+    # 每周一、周四早上8点 (UTC+8 = UTC+0)
+    - cron: '0 0 * * 1,4'
+  workflow_dispatch:
+    inputs:
+      count:
+        description: '每种类型抓取数量'
+        required: false
+        default: '30'
+        type: string
+
+env:
+  PYTHONUNBUFFERED: 1
+  PIP_DISABLE_PIP_VERSION_CHECK: 1
+
+jobs:
+  fetch-and-score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 🐍 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🔧 安装 gallery-dl
+        run: |
+          pip install gallery-dl
+
+      - name: 🔑 配置 Pixiv Cookie
+        if: env.PIXIV_COOKIE != ''
+        env:
+          PIXIV_COOKIE: ${{ secrets.PIXIV_COOKIE }}
+        run: |
+          mkdir -p ~/.gallery-dl
+          python3 scripts/setup_gallery_dl.py
+
+      - name: 🔍 抓取图片
+        env:
+          PIXIV_COOKIE: ${{ secrets.PIXIV_COOKIE }}
+          WALLHAVEN_API_KEY: ${{ secrets.WALLHAVEN_API_KEY }}
+        run: |
+          COUNT="${{ github.event.inputs.count || '30' }}"
+          echo "目标: 每种类型 ${COUNT} 张"
+          python3 scripts/fetch_images.py --wallpaper-count "$COUNT" --avatar-count "$COUNT"
+
+      - name: 🎯 审美评分
+        run: |
+          python3 scripts/score_and_filter.py --input fetch_results.json --output scored_results.json
+
+      - name: 🖼️ 生成画廊
+        run: |
+          python3 scripts/generate_gallery.py --input scored_results.json --output docs/index.html
+
+      - name: 📊 更新日志
+        run: |
+          python3 scripts/update_log.py scored_results.json
+
+      - name: 🚀 提交 & 部署
+        run: |
+          git config user.name "aesthetic-lens-bot"
+          git config user.email "bot@aesthetic-lens.dev"
+          git add docs/ logs/
+          git diff --staged --quiet || git commit -m "🎨 $(date +%Y-%m-%d) 自动采集更新"
+          git push
+
+  deploy:
+    needs: fetch-and-score
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: success()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🚀 部署到 GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+          force_orphan: true

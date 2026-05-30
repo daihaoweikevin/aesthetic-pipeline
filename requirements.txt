@@ -1,0 +1,12 @@
+# Aesthetic Lens Pipeline 依赖
+# GitHub Actions 环境使用
+
+# gallery-dl — 多图源抓取（Pixiv, Wallhaven, Danbooru 等）
+gallery-dl>=1.27
+
+# 评分引擎依赖
+numpy>=1.24
+Pillow>=10.0
+
+# 网页生成
+jinja2>=3.1
