@@ -1,16 +1,19 @@
-name: 🎨 绝美图片自动采集与筛选
+name: 📱 微信公众号每周图片精选
 
 on:
   schedule:
-    # 每周一、周四早上8点 (UTC+8 = UTC+0)
-    - cron: '0 0 * * 1,4'
+    # 每周六早上8点 (北京时间 = UTC+8)
+    - cron: '0 0 * * 6'
   workflow_dispatch:
     inputs:
-      count:
-        description: '每种类型抓取数量'
+      mode:
+        description: '发布模式'
         required: false
-        default: '30'
-        type: string
+        default: 'manual'
+        type: choice
+        options:
+          - manual
+          - api
 
 permissions:
   contents: write
@@ -22,9 +25,9 @@ env:
   PIP_DISABLE_PIP_VERSION_CHECK: 1
 
 jobs:
-  fetch-and-score:
+  weekly-wechat:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - name: 📥 检出代码
@@ -62,32 +65,53 @@ jobs:
           PIXIV_COOKIE: ${{ secrets.PIXIV_COOKIE }}
           WALLHAVEN_API_KEY: ${{ secrets.WALLHAVEN_API_KEY }}
         run: |
-          COUNT="${{ github.event.inputs.count || '30' }}"
-          echo "目标: 每种类型 ${COUNT} 张"
-          python3 scripts/fetch_images.py --wallpaper-count "$COUNT" --anime-count "$COUNT" --avatar-count "$COUNT" --minecraft-count 5
+          python3 scripts/fetch_images.py \
+            --wallpaper-count 20 \
+            --anime-count 15 \
+            --avatar-count 25 \
+            --minecraft-count 8
 
       - name: 🎯 审美评分
         run: |
-          python3 scripts/score_and_filter.py --input fetch_results.json --output scored_results.json
+          python3 scripts/score_and_filter.py \
+            --input fetch_results.json \
+            --output scored_results.json
 
-      - name: 🖼️ 生成画廊
+      - name: 📋 精选50张
         run: |
-          python3 scripts/generate_gallery.py --input scored_results.json --output docs/index.html
+          python3 scripts/select_for_wechat.py \
+            --input scored_results.json \
+            --output wechat_selection.json \
+            --landscape 15 \
+            --anime 10 \
+            --avatar 20 \
+            --minecraft 5
 
-      - name: 📊 更新日志
+      - name: 📝 生成文章
         run: |
-          python3 scripts/update_log.py scored_results.json
+          python3 scripts/generate_wechat_article.py \
+            --input wechat_selection.json \
+            --output wechat_article.html \
+            --mode manual
 
-      - name: 🚀 提交结果
+      - name: 📱 生成预览 & 素材包
+        run: |
+          python3 scripts/publish_to_wechat.py \
+            --selection wechat_selection.json \
+            --article wechat_article.html \
+            --mode manual \
+            --output-dir docs/wechat-preview
+
+      - name: 🚀 提交 & 推送
         run: |
           git config user.name "aesthetic-lens-bot"
           git config user.email "bot@aesthetic-lens.dev"
           git add docs/ logs/
-          git diff --staged --quiet || git commit -m "🎨 $(date +%Y-%m-%d) 自动采集更新"
+          git diff --staged --quiet || git commit -m "📱 $(date +%Y-%m-%d) 微信周刊第$(cat wechat_selection.json | python3 -c 'import json,sys;print(json.load(sys.stdin).get(\"issue_number\",1))')期"
           git push
 
-  deploy:
-    needs: fetch-and-score
+  deploy-preview:
+    needs: weekly-wechat
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: success()
