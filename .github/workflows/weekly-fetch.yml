@@ -59,6 +59,7 @@ jobs:
         env:
           PIXIV_USERNAME: ${{ secrets.PIXIV_USERNAME }}
           PIXIV_PASSWORD: ${{ secrets.PIXIV_PASSWORD }}
+          PIXIV_COOKIE: ${{ secrets.PIXIV_COOKIE }}
           WALLHAVEN_API_KEY: ${{ secrets.WALLHAVEN_API_KEY }}
         run: |
           COUNT="${{ github.event.inputs.count || '30' }}"
@@ -77,7 +78,7 @@ jobs:
         run: |
           python3 scripts/update_log.py scored_results.json
 
-      - name: 🚀 提交 & 部署
+      - name: 🚀 提交结果
         run: |
           git config user.name "aesthetic-lens-bot"
           git config user.email "bot@aesthetic-lens.dev"
@@ -93,6 +94,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: 📤 Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

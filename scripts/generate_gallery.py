@@ -89,16 +89,16 @@ GALLERY_TEMPLATE = """<!DOCTYPE html>
 <div class="hero">
   <h1>绝美图片库</h1>
   <div class="subtitle">Aesthetic Lens · 自动采集 · 审美筛选</div>
-  <div class="date">{{date}}</div>
+  <div class="date">{date}</div>
   <div class="stats">
-    <div class="stat"><div class="num">{{total}}</div><div class="label">收录</div></div>
-    <div class="stat"><div class="num">{{top_score}}</div><div class="label">最高分</div></div>
-    <div class="stat"><div class="num">{{s_count}}</div><div class="label">S级·绝美</div></div>
-    <div class="stat"><div class="num">{{a_count}}</div><div class="label">A级·优秀</div></div>
+    <div class="stat"><div class="num">{total}</div><div class="label">收录</div></div>
+    <div class="stat"><div class="num">{top_score}</div><div class="label">最高分</div></div>
+    <div class="stat"><div class="num">{s_count}</div><div class="label">S级·绝美</div></div>
+    <div class="stat"><div class="num">{a_count}</div><div class="label">A级·优秀</div></div>
   </div>
 </div>
 
-{{sections}}
+{sections}
 
 <div class="footer">
   <p>由 Aesthetic Lens Pipeline 自动生成 · 每周更新</p>

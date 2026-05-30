@@ -172,7 +172,7 @@ def main():
     
     # ── 阶段1: Pixiv 壁纸 ──
     print("── 📌 Pixiv 壁纸 ──")
-    pixiv_ok = os.environ.get("PIXIV_COOKIE", "")
+    pixiv_ok = os.environ.get("PIXIV_COOKIE", "") or (os.environ.get("PIXIV_USERNAME", "") and os.environ.get("PIXIV_PASSWORD", ""))
     if pixiv_ok:
         for tag in PIXIV_WALLPAPER_TAGS[:8]:
             if total_fetched["wallpaper"] >= wp_count:
