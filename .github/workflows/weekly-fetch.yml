@@ -12,6 +12,9 @@ on:
         default: '30'
         type: string
 
+permissions:
+  contents: write
+
 env:
   PYTHONUNBUFFERED: 1
   PIP_DISABLE_PIP_VERSION_CHECK: 1
