@@ -46,17 +46,19 @@ jobs:
         run: |
           pip install gallery-dl
 
-      - name: 🔑 配置 Pixiv Cookie
-        if: env.PIXIV_COOKIE != ''
+      - name: 🔑 配置 Pixiv 登录
+        if: env.PIXIV_USERNAME != '' && env.PIXIV_PASSWORD != ''
         env:
-          PIXIV_COOKIE: ${{ secrets.PIXIV_COOKIE }}
+          PIXIV_USERNAME: ${{ secrets.PIXIV_USERNAME }}
+          PIXIV_PASSWORD: ${{ secrets.PIXIV_PASSWORD }}
         run: |
           mkdir -p ~/.gallery-dl
           python3 scripts/setup_gallery_dl.py
 
       - name: 🔍 抓取图片
         env:
-          PIXIV_COOKIE: ${{ secrets.PIXIV_COOKIE }}
+          PIXIV_USERNAME: ${{ secrets.PIXIV_USERNAME }}
+          PIXIV_PASSWORD: ${{ secrets.PIXIV_PASSWORD }}
           WALLHAVEN_API_KEY: ${{ secrets.WALLHAVEN_API_KEY }}
         run: |
           COUNT="${{ github.event.inputs.count || '30' }}"
