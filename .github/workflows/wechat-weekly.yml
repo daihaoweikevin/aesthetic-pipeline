@@ -9,9 +9,10 @@ on:
       mode:
         description: '发布模式'
         required: false
-        default: 'manual'
+        default: 'email'
         type: choice
         options:
+          - email
           - manual
           - api
 
@@ -94,7 +95,7 @@ jobs:
             --output wechat_article.html \
             --mode manual
 
-      - name: 📱 生成预览 & 素材包
+      - name: 📱 生成预览页
         run: |
           python3 scripts/publish_to_wechat.py \
             --selection wechat_selection.json \
@@ -102,12 +103,26 @@ jobs:
             --mode manual \
             --output-dir docs/wechat-preview
 
+      - name: 📧 发送邮件
+        if: env.SENDER_EMAIL != '' && env.SENDER_PASSWORD != ''
+        env:
+          SMTP_SERVER: smtp.163.com
+          SMTP_PORT: 465
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: |
+          python3 scripts/publish_to_wechat.py \
+            --selection wechat_selection.json \
+            --article wechat_article.html \
+            --mode email
+
       - name: 🚀 提交 & 推送
         run: |
           git config user.name "aesthetic-lens-bot"
           git config user.email "bot@aesthetic-lens.dev"
           git add docs/ logs/
-          git diff --staged --quiet || git commit -m "📱 $(date +%Y-%m-%d) 微信周刊第$(cat wechat_selection.json | python3 -c 'import json,sys;print(json.load(sys.stdin).get(\"issue_number\",1))')期"
+          git diff --staged --quiet || git commit -m "📱 $(date +%Y-%m-%d) 微信周刊更新"
           git push
 
   deploy-preview:

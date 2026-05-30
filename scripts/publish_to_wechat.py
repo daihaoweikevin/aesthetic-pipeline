@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 Aesthetic Lens Pipeline — 微信公众号发布器
-支持两种模式:
-  - api:  认证账号全自动发布（上传素材 → 创建草稿 → 发布）
+支持三种模式:
+  - api:    认证账号全自动发布（上传素材 → 创建草稿 → 发布）
   - manual: 个人号半自动模式（手机预览页 + 图片可长按保存）
+  - email:  邮件自动发送（文章+图片直接发到邮箱，打开即用）
 """
-import json, os, sys, argparse, zipfile, shutil, hashlib
+import json, os, sys, argparse, shutil, hashlib
 from pathlib import Path
 from datetime import datetime
 
@@ -481,11 +482,187 @@ function showToast(msg) {{
     return True
 
 
+# ─── 路径C: 邮件自动发送 ─────────────────────────────
+
+def publish_via_email(selection_data, smtp_server, smtp_port, sender_email, sender_password, recipient_email):
+    """生成邮件内容并发送：文章HTML+图片内嵌"""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.image import MIMEImage
+
+    print("\n" + "=" * 50)
+    print("📧 邮件自动发送模式")
+    print("=" * 50)
+
+    issue = selection_data.get("issue_number", 1)
+    total = selection_data.get("total", 50)
+    date_str = datetime.now().strftime("%Y年%m月%d日")
+    cats = selection_data.get("categories", {})
+
+    # ── 构建邮件HTML内容 ──
+    cat_config = {
+        "landscape": {"emoji": "📷", "title": "风景壁纸"},
+        "anime_wallpaper": {"emoji": "🎨", "title": "动漫风壁纸"},
+        "avatar": {"emoji": "😊", "title": "精选头像"},
+        "minecraft": {"emoji": "🎮", "title": "像素风景"},
+    }
+
+    # 收集所有图片（按顺序编号，用于内嵌cid）
+    all_images = []
+    for cat_key in ["landscape", "anime_wallpaper", "minecraft", "avatar"]:
+        for img in cats.get(cat_key, []):
+            all_images.append((cat_key, img))
+
+    # 构建HTML body
+    body_parts = []
+    body_parts.append(f"""<div style="text-align:center;padding:20px;background:linear-gradient(180deg,#fffdf8,#faf8f4);border-bottom:1px solid #e8e4dc;">
+  <p style="font-size:11px;color:#c9b99a;letter-spacing:0.2em;">AESTHETIC LENS</p>
+  <h1 style="font-size:22px;font-weight:300;color:#1a1a1a;letter-spacing:0.06em;">绝美图片周刊 · 第{issue}期</h1>
+  <p style="font-size:12px;color:#bbb;margin-top:6px;">{date_str} · 本期精选 {total} 张</p>
+  <p style="font-size:13px;color:#999;margin-top:10px;line-height:1.8;">每周六，为你精选世间绝美图片<br/>风景 · 动漫 · 头像 · 像素 · 一期一会</p>
+</div>""")
+
+    img_idx = 0
+    for cat_key, config in cat_config.items():
+        images = cats.get(cat_key, [])
+        if not images:
+            continue
+        count = len(images)
+
+        body_parts.append(f"""<div style="margin:20px 0 8px;padding:10px 14px;background:linear-gradient(135deg,#faf9f7,#f5f0eb);border-left:4px solid #c9b99a;border-radius:0 8px 8px 0;">
+  <span style="font-size:16px;font-weight:600;color:#2c2c2c;">{config['emoji']} {config['title']}</span>
+  <span style="font-size:12px;color:#999;">（{count}张）</span>
+</div>""")
+
+        if cat_key == "avatar":
+            # 头像双列
+            row_open = False
+            for i, img in enumerate(images):
+                if i % 2 == 0:
+                    body_parts.append('<div style="display:flex;gap:8px;margin:6px 0;">')
+                    row_open = True
+                desc = img.get("description", "")
+                idx_num = img.get("index_in_category", 0)
+                cid = f"img_{img_idx}"
+                body_parts.append(f"""<div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.05);">
+  <img src="cid:{cid}" style="width:100%;display:block;"/>
+  <div style="padding:5px 8px;font-size:11px;color:#999;">{idx_num:02d}. {desc}</div>
+</div>""")
+                img_idx += 1
+                if i % 2 == 1 or i == len(images) - 1:
+                    body_parts.append('</div>')
+                    row_open = False
+        else:
+            for img in images:
+                desc = img.get("description", "")
+                idx_num = img.get("index_in_category", 0)
+                grade = img.get("grade", "B")
+                score = img.get("total_score", 0)
+                grade_colors = {"S": "#92400e", "A": "#1e40af", "B": "#6b7280", "C": "#9ca3af"}
+                gc = grade_colors.get(grade, "#999")
+                cid = f"img_{img_idx}"
+                body_parts.append(f"""<div style="margin:8px 0;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+  <img src="cid:{cid}" style="width:100%;display:block;"/>
+  <div style="padding:8px 12px;display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:13px;color:#555;">{idx_num:02d}. {desc}</span>
+    <span style="font-size:10px;color:{gc};background:#f8f6f2;padding:2px 8px;border-radius:10px;">{grade} · {score}</span>
+  </div>
+</div>""")
+                img_idx += 1
+
+    body_parts.append(f"""<div style="text-align:center;padding:20px;color:#ccc;border-top:1px solid #e8e4dc;margin-top:16px;">
+  <p style="font-size:16px;color:#c9b99a;">✦</p>
+  <p style="font-size:13px;color:#999;">下周六见</p>
+  <p style="font-size:11px;color:#ccc;margin-top:4px;">图片长按可保存 → 公众号后台粘贴发布</p>
+</div>""")
+
+    html_body = f"""<div style="max-width:677px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;color:#2c2c2c;line-height:1.8;font-size:15px;">
+{"".join(body_parts)}
+</div>"""
+
+    # ── 构建邮件 ──
+    msg = MIMEMultipart("related")
+    msg["Subject"] = f"绝美图片周刊 · 第{issue}期 | {date_str}"
+    msg["From"] = sender_email
+    msg["To"] = recipient_email
+
+    # HTML正文
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    # 内嵌图片
+    attached = 0
+    skipped = 0
+    for idx, (cat_key, img) in enumerate(all_images):
+        local = img.get("local_path", "")
+        if not local or not os.path.exists(local):
+            skipped += 1
+            continue
+
+        # 限制单张图片大小（邮件不宜太大）
+        file_size = os.path.getsize(local)
+        if file_size > 5 * 1024 * 1024:  # 超过5MB的压缩或跳过
+            try:
+                from PIL import Image
+                import io
+                pil_img = Image.open(local)
+                # 缩小到合理尺寸
+                pil_img.thumbnail((1200, 1200), Image.LANCZOS)
+                buf = io.BytesIO()
+                pil_img.save(buf, format="JPEG", quality=85)
+                img_data = buf.getvalue()
+            except Exception:
+                skipped += 1
+                continue
+        else:
+            with open(local, "rb") as f:
+                img_data = f.read()
+
+        cid = f"img_{idx}"
+        mime_img = MIMEImage(img_data)
+        ext = Path(local).suffix.lower()
+        if ext == ".png":
+            mime_img.set_type("image/png")
+        elif ext == ".webp":
+            mime_img.set_type("image/webp")
+        else:
+            mime_img.set_type("image/jpeg")
+        mime_img.add_header("Content-ID", f"<{cid}>")
+        mime_img.add_header("Content-Disposition", "inline", filename=f"{cid}{ext}")
+        msg.attach(mime_img)
+        attached += 1
+
+    print(f"  📎 内嵌图片: {attached} 张 (跳过: {skipped})")
+
+    # ── 发送邮件 ──
+    print(f"  📤 连接SMTP: {smtp_server}:{smtp_port}")
+    try:
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
+            server.starttls()
+
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, [recipient_email], msg.as_string())
+        server.quit()
+
+        print(f"\n✅ 邮件发送成功!")
+        print(f"   收件人: {recipient_email}")
+        print(f"   主题: {msg['Subject']}")
+        print(f"   图片: {attached} 张内嵌")
+        return True
+
+    except Exception as e:
+        print(f"\n❌ 邮件发送失败: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="微信公众号发布器")
     parser.add_argument("--selection", required=True, help="wechat_selection.json 路径")
     parser.add_argument("--article", required=True, help="文章HTML路径")
-    parser.add_argument("--mode", choices=["api", "manual"], default="manual", help="发布模式")
+    parser.add_argument("--mode", choices=["api", "manual", "email"], default="manual", help="发布模式")
     parser.add_argument("--output-dir", default="docs/wechat-preview", help="输出目录")
     parser.add_argument("--appid", default="", help="微信公众号 AppID（api模式）")
     parser.add_argument("--secret", default="", help="微信公众号 AppSecret（api模式）")
@@ -502,6 +679,25 @@ def main():
             print("❌ API模式需要提供 AppID 和 AppSecret")
             sys.exit(1)
         publish_via_api(selection_data, args.article, args.appid, args.secret)
+
+    elif args.mode == "email":
+        smtp_server = os.environ.get("SMTP_SERVER", "smtp.163.com")
+        smtp_port = int(os.environ.get("SMTP_PORT", "465"))
+        sender_email = os.environ.get("SENDER_EMAIL", "")
+        sender_password = os.environ.get("SENDER_PASSWORD", "")
+        recipient_email = os.environ.get("RECIPIENT_EMAIL", "dhwjln923@163.com")
+
+        if not sender_email or not sender_password:
+            print("❌ 邮件模式需要配置 SMTP 凭证")
+            print("   请设置 GitHub Secrets:")
+            print("   SENDER_EMAIL    = 发件邮箱地址")
+            print("   SENDER_PASSWORD = 邮箱SMTP授权码")
+            print("   RECIPIENT_EMAIL = 收件邮箱（默认 dhwjln923@163.com）")
+            sys.exit(1)
+
+        publish_via_email(selection_data, smtp_server, smtp_port,
+                          sender_email, sender_password, recipient_email)
+
     else:
         publish_manual(selection_data, args.article, args.output_dir)
 
