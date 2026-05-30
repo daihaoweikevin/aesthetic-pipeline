@@ -139,7 +139,7 @@ def collect_results():
             results.append({
                 "source": source,
                 "id": img_file.stem,
-                "local_path": str(img_file.relative_to(OUTPUT_DIR)),
+                "local_path": str(img_file),  # 绝对路径
                 "file_size": stat.st_size,
                 "image_type": dir_type,
                 "file_ext": suffix,

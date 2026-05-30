@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 Aesthetic Lens Pipeline — 画廊生成器
-生成极简奢华的 HTML 画廊，部署到 GitHub Pages
+拷贝图片到 docs/images/，生成 HTML 画廊
 """
-import json, sys, os
+import json, sys, os, shutil, hashlib
+from pathlib import Path
 from datetime import datetime
 
 GALLERY_TEMPLATE = """<!DOCTYPE html>
@@ -110,25 +111,50 @@ GALLERY_TEMPLATE = """<!DOCTYPE html>
 def generate_gallery(scored_data, output_path):
     images = scored_data.get("images", [])
     summary = scored_data
-    
+
+    # 创建 docs/images/ 目录
+    docs_dir = Path(output_path).parent
+    images_dir = docs_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    # 拷贝图片到 docs/images/
+    for img in images:
+        local = img.get("local_path", "")
+        if not local or not os.path.exists(local):
+            continue
+
+        # 生成唯一文件名
+        src = img.get("source", "unknown")
+        iid = img.get("id", "0")
+        key = hashlib.md5(f"{src}_{iid}".encode()).hexdigest()[:10]
+        ext = os.path.splitext(local)[1] or ".jpg"
+        dest_name = f"{key}{ext}"
+        dest_path = images_dir / dest_name
+
+        if not dest_path.exists():
+            shutil.copy2(local, dest_path)
+
+        img["gallery_url"] = f"images/{dest_name}"
+
     # 分级分组
     s_imgs = [img for img in images if img["grade"] == "S"]
     a_imgs = [img for img in images if img["grade"] == "A"]
     b_imgs = [img for img in images if img["grade"] == "B"]
-    
+
     def render_section(title, imgs):
         if not imgs:
             return ""
         cards = []
         for img in imgs:
-            local = img.get("local_path", "")
-            url = f"../downloads/{local}" if local else ""
+            url = img.get("gallery_url", "")
+            if not url:
+                continue
             score = img["total_score"]
             grade = img["grade"]
             source = img.get("source", "?")
             w = img.get("width", "?")
             h = img.get("height", "?")
-            
+
             cards.append(f"""<div class="card">
     <img class="card-img" src="{url}" alt="" loading="lazy" onerror="this.style.display='none'">
     <div class="card-body">
@@ -137,12 +163,12 @@ def generate_gallery(scored_data, output_path):
       <div class="card-dims">{w}×{h}</div>
     </div>
   </div>""")
-        
+
         return f"""<div class="section-header">{title}</div>
 <div class="gallery">
 {''.join(cards)}
 </div>"""
-    
+
     sections = ""
     if s_imgs:
         sections += render_section("✦ S级 · 绝美", s_imgs)
@@ -150,10 +176,10 @@ def generate_gallery(scored_data, output_path):
         sections += render_section("◆ A级 · 优秀", a_imgs)
     if b_imgs:
         sections += render_section("◇ B级 · 良好", b_imgs)
-    
+
     if not sections:
         sections = '<div class="empty">暂无符合标准的图片，请等待下次采集。</div>'
-    
+
     html = GALLERY_TEMPLATE.format(
         date=datetime.now().strftime("%Y年%m月%d日"),
         total=summary.get("total", 0),
@@ -162,13 +188,15 @@ def generate_gallery(scored_data, output_path):
         a_count=summary.get("grade_distribution", {}).get("A", 0),
         sections=sections,
     )
-    
-    # 确保输出目录存在
+
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    
+
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
-    
+
+    img_count = len(list(images_dir.glob("*")))
+    print(f"📁 已拷贝 {img_count} 张图片到 {images_dir}")
+
     return output_path
 
 
@@ -178,13 +206,13 @@ def main():
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", default="docs/index.html")
     args = parser.parse_args()
-    
+
     with open(args.input, "r", encoding="utf-8") as f:
         data = json.load(f)
-    
+
     path = generate_gallery(data, args.output)
     print(f"🖼️  画廊已生成: {path}")
-    
+
     s_count = sum(1 for img in data.get("images", []) if img["grade"] == "S")
     a_count = sum(1 for img in data.get("images", []) if img["grade"] == "A")
     print(f"   S级: {s_count}张 | A级: {a_count}张 | 总计: {data.get('total',0)}张")
